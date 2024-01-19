@@ -1,5 +1,7 @@
 homepage: "https://www.teads.com"
 documentation: "https://help.teads.com/en/collections/3221002-teads-universal-pixel"
 versions:
+  - sha: 7b2d765af809b92e9afa71651bf8258fde025fa9
+    changeNotes: Fix issue when there is no auctid
   - sha: 4fb97c63ff8ad4cd89120816ef5d0d3ee8c10495
     changeNotes: Initial release
