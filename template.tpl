@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -284,6 +284,8 @@ function callConversionAPI(auctid) {
 const auctid = retrieveAuctidAndSetOrUpdateCookie();
 if(auctid) {
   callConversionAPI(auctid);
+} else {
+  data.gtmOnSuccess();
 }
 
 
@@ -589,7 +591,7 @@ scenarios:
 
     assertApi('setCookie').wasNotCalled();
     assertApi('callConversionAPI').wasNotCalled();
-    assertApi('gtmOnSuccess').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
 setup: "const JSON = require('JSON');\n\nconst requests = [];\n\nmock('sendHttpRequest',\
   \ () => {\n  const callback = arguments[1];\n\n  callback(200, {}, {});\n  \n  requests.push({\n\
   \    url: arguments[0],\n    headers: arguments[2].headers,\n    body: JSON.parse(arguments[3]),\n\
