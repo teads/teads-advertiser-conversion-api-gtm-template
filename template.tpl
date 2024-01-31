@@ -14,6 +14,13 @@ ___INFO___
   "version": 1,
   "securityGroups": [],
   "displayName": "Teads Advertiser Conversion API",
+  "categories": [
+    "ADVERTISING",
+    "ATTRIBUTION",
+    "CONVERSIONS",
+    "LEAD_GENERATION",
+    "REMARKETING"
+  ],
   "brand": {
     "id": "brand_dummy",
     "displayName": "",
