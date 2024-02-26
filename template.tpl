@@ -89,7 +89,7 @@ ___TEMPLATE_PARAMETERS___
       },
       {
         "value": "timeSpent",
-        "displayValue": "Time spent"
+        "displayValue": "Time Spent"
       }
     ],
     "simpleValueType": true
