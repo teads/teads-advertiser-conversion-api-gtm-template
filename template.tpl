@@ -1,4 +1,4 @@
-﻿___TERMS_OF_SERVICE___
+___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -86,6 +86,10 @@ ___TEMPLATE_PARAMETERS___
       {
         "value": "conversion",
         "displayValue": "Conversion"
+      },
+      {
+        "value": "timeSpent",
+        "displayValue": "Time spent"
       }
     ],
     "simpleValueType": true
@@ -154,7 +158,7 @@ ___TEMPLATE_PARAMETERS___
           {
             "type": "REGEX",
             "args": [
-              "^\\d*\\.?\\d+$"
+              "(^\\d*\\.?\\d+$)?"
             ],
             "errorMessage": "Price must be a valid number"
           }
@@ -171,7 +175,7 @@ ___TEMPLATE_PARAMETERS___
           {
             "type": "REGEX",
             "args": [
-              "^[A-Z]{3}$"
+              "(^[A-Z]{3}$)?"
             ],
             "errorMessage": "Currency must be an ISO 4217 currency code (e.g., \"USD\")"
           }
@@ -222,22 +226,36 @@ const getCookieValues = require('getCookieValues');
 const sendHttpRequest = require('sendHttpRequest');
 const JSON = require('JSON');
 const getTimestampMillis = require('getTimestampMillis');
+const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
+const generateRandom = require('generateRandom');
+const createRegex = require('createRegex');
 
-const COOKIE_NAME = "tfpai";
-const COOKIE_MAX_AGE = 2592000; // 30 days
+const TFPAI_COOKIE = { name: 'tfpai', ttl: 2592000 }; // 30 days
+const TFPSI_COOKIE = { name: 'tfpsi', ttl: 1800000 }; // 30 minutes
+
 const CONVERSION_API_URL = "https://ca.teads.tv/v1/event";
 const CONVERSION_API_TEST_URL = "https://ca.teads.tv/v1/test/event";
- 
+
+const pageUrl = getEventData('page_location');
+
+function generateUUID() {
+  const regex = createRegex('/[xy]/g', 'g');
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(regex, c => {
+    const random = c === 'x' ? generateRandom(0, 15) : generateRandom(8, 11);
+    return random.toString(16);
+  });
+}
+
+
 function retrieveAuctidAndSetOrUpdateCookie() {
-  const pageUrl = getEventData('page_location');  
   const urlAuctid = parseUrl(pageUrl).searchParams.auctid;
   if(urlAuctid) {
-    setCookie(COOKIE_NAME, urlAuctid, {'max-age': COOKIE_MAX_AGE});
+    setCookie(TFPAI_COOKIE.name, urlAuctid, { 'max-age': TFPAI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
     return urlAuctid;
   } else {
-    const cookieAuctid = getCookieValues(COOKIE_NAME)[0];
+    const cookieAuctid = getCookieValues(TFPAI_COOKIE.name)[0];
     if(cookieAuctid) {
-      setCookie(COOKIE_NAME, cookieAuctid, {'max-age': COOKIE_MAX_AGE});
+      setCookie(TFPAI_COOKIE.name, cookieAuctid, { 'max-age': TFPAI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
       return cookieAuctid;
     }
   }
@@ -245,17 +263,18 @@ function retrieveAuctidAndSetOrUpdateCookie() {
   return null;
 }
 
-function getStringifiedPayload(auctid) {
+function retrieveSessionIdAndSetOrUpdateCookie() {
+  const userSessionId = getCookieValues(TFPSI_COOKIE.name)[0] || generateUUID();
+  setCookie(TFPSI_COOKIE.name, userSessionId, { 'max-age': TFPSI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
+  return userSessionId;
+}
+
+function getStringifiedPayload(auctid, sessionId) {
   const conversionParams = {
     price: data.price,
     currency: data.currency,
     name: data.name,
   };
-
-  const firstPartyCookies = [{ 
-    name: COOKIE_NAME, 
-    value: auctid
-  }];
 
   return JSON.stringify({
     auctid: auctid,
@@ -263,34 +282,40 @@ function getStringifiedPayload(auctid) {
     buyer_pixel_id: data.buyer_pixel_id,
     conversion_type: data.conversion_type,
     conversion_params: conversionParams,
-    event_source_url: getEventData('page_location'),
-    first_party_cookies: firstPartyCookies,
+    event_source_url: pageUrl,
+    user_session_id: sessionId,
     event_time: getTimestampMillis(),
   });
 }
 
-function callConversionAPI(auctid) {
+function callConversionAPI(auctid, sessionId) {
   const url = data.is_test ? CONVERSION_API_TEST_URL : CONVERSION_API_URL;
 
   const headers = {
-    'Content-Type': 'application/json', 
-    Authorization: "Bearer " + data.token
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + data.token
   };
 
-  const options = { headers: headers, method: 'POST', timeout: 3000 };
-  
-  sendHttpRequest(url, (statusCode, headers, body) => {
+  const options = {
+    headers: headers,
+    method: 'POST',
+    timeout: 3000
+  };
+
+  sendHttpRequest(url, statusCode => {
     if (statusCode >= 200 && statusCode < 300) {
       data.gtmOnSuccess();
     } else {
       data.gtmOnFailure();
     }
-  }, options, getStringifiedPayload(auctid));
+  }, options, getStringifiedPayload(auctid, sessionId));
 }
 
 const auctid = retrieveAuctidAndSetOrUpdateCookie();
+const sessionId = retrieveSessionIdAndSetOrUpdateCookie();
+
 if(auctid) {
-  callConversionAPI(auctid);
+  callConversionAPI(auctid, sessionId);
 } else {
   data.gtmOnSuccess();
 }
@@ -495,7 +520,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {'max-age': 2592000 });
+    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {'max-age': 2592000, domain: 'teads.com' });
     assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - update cookie if there is already one and auctid is present
@@ -518,7 +543,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {'max-age': 2592000 });
+    assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {'max-age': 2592000, domain: 'teads.com' });
     assertThat(requests[0].body.auctid).isEqualTo('1234-1234-1234-1234');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - renew cookie if there is already one and auctid is not present
@@ -540,7 +565,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith('tfpai', '0000-0000-0000-0000', {'max-age': 2592000 });
+    assertApi('setCookie').wasCalledWith('tfpai', '0000-0000-0000-0000', {'max-age': 2592000, domain: 'teads.com' });
     assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: ConversionAPI - Simple call
@@ -550,22 +575,21 @@ scenarios:
     \  currency: 'USD',\n  name: 'conversion name',\n  is_test: false,\n};\n\nrunCode(mockData);\n\
     \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/event\"\
     ,\n  headers: {\n    'Content-Type': 'application/json', \n    Authorization:\
-    \ 'Bearer test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n    action:\
-    \ 'conversion',\n    conversion_type: 'AddToCart',\n    buyer_pixel_id: 123,\n\
-    \    conversion_params: {\n      price: 123,\n      currency: 'USD',\n      name:\
-    \ 'conversion name'\n    },\n    event_source_url: 'https://teads.com',\n    first_party_cookies:\
-    \ [{ name: 'tfpai', value: '0000-0000-0000-0000' }],\n    event_time: 1234\n \
-    \ }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \ 'Bearer test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n    user_session_id:\
+    \ '0000-0000-0000-0000',\n    action: 'conversion',\n    conversion_type: 'AddToCart',\n\
+    \    buyer_pixel_id: 123,\n    conversion_params: {\n      price: 123,\n     \
+    \ currency: 'USD',\n      name: 'conversion name'\n    },\n    event_source_url:\
+    \ 'https://teads.com',\n    event_time: 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: ConversionAPI - Simple call without conversion params
   code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
     \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
     \ 123,\n  action: 'page_view',\n  is_test: false,\n};\n\nrunCode(mockData);\n\n\
     assertThat(requests[0]).isEqualTo({\n  url: 'https://ca.teads.tv/v1/event',\n\
     \  headers: {\n    'Content-Type': 'application/json', \n    Authorization: 'Bearer\
-    \ test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n    action: 'page_view',\n\
-    \    buyer_pixel_id: 123,\n    conversion_params: {},\n    event_source_url: 'https://teads.com',\n\
-    \    first_party_cookies: [{ name: 'tfpai', value: '0000-0000-0000-0000' }],\n\
-    \    event_time: 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \ test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n    user_session_id:\
+    \ '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id: 123,\n\
+    \    conversion_params: {},\n    event_source_url: 'https://teads.com',\n    event_time:\
+    \ 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: ConversionAPI - Call on test route
   code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
     \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
@@ -573,11 +597,11 @@ scenarios:
     \ name',\n  is_test: true,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
     \  url: \"https://ca.teads.tv/v1/test/event\",\n  headers: {\n    'Content-Type':\
     \ 'application/json', \n    Authorization: 'Bearer test'\n  },\n  body: {\n  \
-    \  auctid: '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id:\
-    \ 123,\n    conversion_params: {\n      price: 123,\n      currency: 'USD',\n\
-    \      name: 'conversion name'\n    },\n    event_source_url: 'https://teads.com',\n\
-    \    first_party_cookies: [{ name: 'tfpai', value: '0000-0000-0000-0000' }],\n\
-    \    event_time: 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \  auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
+    \    action: 'page_view',\n    buyer_pixel_id: 123,\n    conversion_params: {\n\
+    \      price: 123,\n      currency: 'USD',\n      name: 'conversion name'\n  \
+    \  },\n    event_source_url: 'https://teads.com',\n    event_time: 1234\n  }\n\
+    });\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Do nothing if there is no auctid
   code: |-
     mock('getEventData', 'https://teads.com');
@@ -596,7 +620,6 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasNotCalled();
     assertApi('callConversionAPI').wasNotCalled();
     assertApi('gtmOnSuccess').wasCalled();
 setup: "const JSON = require('JSON');\n\nconst requests = [];\n\nmock('sendHttpRequest',\
