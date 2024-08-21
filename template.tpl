@@ -580,7 +580,8 @@ scenarios:
     \ '0000-0000-0000-0000',\n    action: 'conversion',\n    conversion_type: 'AddToCart',\n\
     \    buyer_pixel_id: 123,\n    conversion_params: {\n      price: 123,\n     \
     \ currency: 'USD',\n      name: 'conversion name'\n    },\n    event_source_url:\
-    \ 'https://teads.com',\n    event_time: 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \ 'https://teads.com',\n    event_time: 1234,\n    environment: 'server-gtm'\n\
+    \  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: ConversionAPI - Simple call without conversion params
   code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
     \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
@@ -590,7 +591,7 @@ scenarios:
     \ test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n    user_session_id:\
     \ '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id: 123,\n\
     \    conversion_params: {},\n    event_source_url: 'https://teads.com',\n    event_time:\
-    \ 1234\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \ 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: ConversionAPI - Call on test route
   code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
     \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
@@ -601,8 +602,8 @@ scenarios:
     \  auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
     \    action: 'page_view',\n    buyer_pixel_id: 123,\n    conversion_params: {\n\
     \      price: 123,\n      currency: 'USD',\n      name: 'conversion name'\n  \
-    \  },\n    event_source_url: 'https://teads.com',\n    event_time: 1234\n  }\n\
-    });\n\nassertApi('gtmOnSuccess').wasCalled();"
+    \  },\n    event_source_url: 'https://teads.com',\n    event_time: 1234,\n   \
+    \ environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Do nothing if there is no auctid
   code: |-
     mock('getEventData', 'https://teads.com');
