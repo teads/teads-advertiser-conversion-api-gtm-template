@@ -228,7 +228,6 @@ const JSON = require('JSON');
 const getTimestampMillis = require('getTimestampMillis');
 const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
 const generateRandom = require('generateRandom');
-const createRegex = require('createRegex');
 
 const TFPAI_COOKIE = { name: 'tfpai', ttl: 2592000 }; // 30 days
 const TFPSI_COOKIE = { name: 'tfpsi', ttl: 1800000 }; // 30 minutes
@@ -238,12 +237,17 @@ const CONVERSION_API_TEST_URL = "https://ca.teads.tv/v1/test/event";
 
 const pageUrl = getEventData('page_location');
 
+function generateUUIDCharacter(item) {
+  const random = item === 'x' ? generateRandom(0, 15) : generateRandom(8, 11);
+  return random.toString(16);
+}
+
 function generateUUID() {
-  const regex = createRegex('/[xy]/g', 'g');
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(regex, c => {
-    const random = c === 'x' ? generateRandom(0, 15) : generateRandom(8, 11);
-    return random.toString(16);
-  });
+  let result = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+  for (let i = 0; i < 30; i++) {
+    result = result.replace('x', generateUUIDCharacter);
+  }
+  return result.replace('y', generateUUIDCharacter);
 }
 
 
@@ -416,6 +420,53 @@ ___SERVER_PERMISSIONS___
                     "string": "any"
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "tfpsi"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
               }
             ]
           }
@@ -449,6 +500,10 @@ ___SERVER_PERMISSIONS___
               {
                 "type": 1,
                 "string": "tfpai"
+              },
+              {
+                "type": 1,
+                "string": "tfpsi"
               }
             ]
           }
@@ -623,6 +678,49 @@ scenarios:
     runCode(mockData);
 
     assertApi('callConversionAPI').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: tfpsi cookie - set cookie if there is not
+  code: |-
+    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: 123,
+      action: 'page_view',
+      price: 123,
+      currency: 'USD',
+      name: 'conversion name',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasNotCalledWith("tfpsi", "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", {'max-age': 1800000, domain: 'teads.com' });
+    assertThat(requests[0].body.user_session_id).isNotEmpty();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: tfpsi cookie - update cookie if there is already one
+  code: |-
+    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
+
+    mock('setCookie');
+    mock('getCookieValues', ['4e784302-edbf-47dd-9f74-9c03c3835fe0']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: 123,
+      action: 'page_view',
+      price: 123,
+      currency: 'USD',
+      name: 'conversion name',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpsi", "4e784302-edbf-47dd-9f74-9c03c3835fe0", {'max-age': 1800000, domain: 'teads.com' });
+    assertThat(requests[0].body.user_session_id).isEqualTo('4e784302-edbf-47dd-9f74-9c03c3835fe0');
     assertApi('gtmOnSuccess').wasCalled();
 setup: "const JSON = require('JSON');\n\nconst requests = [];\n\nmock('sendHttpRequest',\
   \ () => {\n  const callback = arguments[1];\n\n  callback(200, {}, {});\n  \n  requests.push({\n\
