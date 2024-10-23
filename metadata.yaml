@@ -1,6 +1,8 @@
 homepage: "https://www.teads.com"
 documentation: "https://help.teads.com/en/collections/3221002-teads-universal-pixel"
 versions:
+  - sha: 07ca65d8635acc2832c45663b339bc22c54ea61d
+    changeNotes: Provide price & currency conversion parameters only if both are defined correctly
   - sha: 670cb73f9e6424615eb81d31fdfa12586802cf9e
     changeNotes: Use new API for sendHttpRequest (with promise) & catch failure
   - sha: 94dd39b06c3d1af02d8706363260cba0c82c7aae
