@@ -275,9 +275,9 @@ function retrieveSessionIdAndSetOrUpdateCookie() {
 
 function getStringifiedPayload(auctid, sessionId) {
   const conversionParams = {
-    price: data.price,
-    currency: data.currency,
-    name: data.name,
+    price: data.price && data.price !== "" ? data.price : undefined,
+    currency: data.currency && data.currency !== "" ? data.currency : undefined,
+    name: data.name && data.name !== "" ? data.name : undefined,
   };
 
   return JSON.stringify({
@@ -647,6 +647,26 @@ scenarios:
     \ '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id: 123,\n\
     \    conversion_params: {},\n    event_source_url: 'https://teads.com',\n    event_time:\
     \ 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+- name: ConversionAPI - Simple call with empty string for all conversion params
+  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
+    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
+    \ 123,\n  action: 'page_view',\n  is_test: false,\n  price: \"\",\n  currency:\
+    \ \"\",\n  name: \"\",\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
+    \  url: 'https://ca.teads.tv/v1/event',\n  headers: {\n    'Content-Type': 'application/json',\
+    \ \n    Authorization: 'Bearer test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
+    \    user_session_id: '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id:\
+    \ 123,\n    conversion_params: {},\n    event_source_url: 'https://teads.com',\n\
+    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+- name: ConversionAPI - Simple call with undefined for all conversion params
+  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
+    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
+    \ 123,\n  action: 'page_view',\n  is_test: false,\n  price: undefined,\n  currency:\
+    \ undefined,\n  name: undefined,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
+    \  url: 'https://ca.teads.tv/v1/event',\n  headers: {\n    'Content-Type': 'application/json',\
+    \ \n    Authorization: 'Bearer test'\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
+    \    user_session_id: '0000-0000-0000-0000',\n    action: 'page_view',\n    buyer_pixel_id:\
+    \ 123,\n    conversion_params: {},\n    event_source_url: 'https://teads.com',\n\
+    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: ConversionAPI - Call on test route
   code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
     \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
