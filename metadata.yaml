@@ -1,6 +1,8 @@
 homepage: "https://www.teads.com"
 documentation: "https://help.teads.com/en/collections/3221002-teads-universal-pixel"
 versions:
+  - sha: 670cb73f9e6424615eb81d31fdfa12586802cf9e
+    changeNotes: Use new API for sendHttpRequest (with promise) & catch failure
   - sha: 94dd39b06c3d1af02d8706363260cba0c82c7aae
     changeNotes: Keep conversion params & type only for conversion event
   - sha: f7d649dbcca3ea0a9f120abf0c945d90307eb594
