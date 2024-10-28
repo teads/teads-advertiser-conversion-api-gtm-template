@@ -219,21 +219,20 @@ ___TEMPLATE_PARAMETERS___
 
 ___SANDBOXED_JS_FOR_SERVER___
 
-const getEventData = require("getEventData");
-const parseUrl = require("parseUrl");
+const getEventData = require('getEventData');
+const parseUrl = require('parseUrl');
 const setCookie = require('setCookie');
 const getCookieValues = require('getCookieValues');
 const sendHttpRequest = require('sendHttpRequest');
 const JSON = require('JSON');
 const getTimestampMillis = require('getTimestampMillis');
-const computeEffectiveTldPlusOne = require('computeEffectiveTldPlusOne');
 const generateRandom = require('generateRandom');
 
 const TFPAI_COOKIE = { name: 'tfpai', ttl: 2592000 }; // 30 days
 const TFPSI_COOKIE = { name: 'tfpsi', ttl: 1800000 }; // 30 minutes
 
-const CONVERSION_API_URL = "https://ca.teads.tv/v1/event";
-const CONVERSION_API_TEST_URL = "https://ca.teads.tv/v1/test/event";
+const CONVERSION_API_URL = 'https://ca.teads.tv/v1/event';
+const CONVERSION_API_TEST_URL = 'https://ca.teads.tv/v1/test/event';
 
 const pageUrl = getEventData('page_location');
 
@@ -250,16 +249,26 @@ function generateUUID() {
   return result.replace('y', generateUUIDCharacter);
 }
 
+function setFirstPartyCookie(cookie, value) {
+  setCookie(cookie.name, value, {
+    domain: 'auto',
+    httpOnly: false,
+    'max-age': cookie.ttl,
+    path: '/',
+    secure: true,
+    samesite: 'none',
+  });
+}
 
 function retrieveAuctidAndSetOrUpdateCookie() {
   const urlAuctid = parseUrl(pageUrl).searchParams.auctid;
   if(urlAuctid) {
-    setCookie(TFPAI_COOKIE.name, urlAuctid, { 'max-age': TFPAI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
+    setFirstPartyCookie(TFPAI_COOKIE, urlAuctid);
     return urlAuctid;
   } else {
     const cookieAuctid = getCookieValues(TFPAI_COOKIE.name)[0];
     if(cookieAuctid) {
-      setCookie(TFPAI_COOKIE.name, cookieAuctid, { 'max-age': TFPAI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
+      setFirstPartyCookie(TFPAI_COOKIE, cookieAuctid);
       return cookieAuctid;
     }
   }
@@ -269,15 +278,15 @@ function retrieveAuctidAndSetOrUpdateCookie() {
 
 function retrieveSessionIdAndSetOrUpdateCookie() {
   const userSessionId = getCookieValues(TFPSI_COOKIE.name)[0] || generateUUID();
-  setCookie(TFPSI_COOKIE.name, userSessionId, { 'max-age': TFPSI_COOKIE.ttl, domain: computeEffectiveTldPlusOne(pageUrl) });
+  setFirstPartyCookie(TFPSI_COOKIE, userSessionId);
   return userSessionId;
 }
 
 function getStringifiedPayload(auctid, sessionId) {
   const conversionParams = {
-    name: data.name && data.name !== "" ? data.name : undefined,
+    name: data.name && data.name !== '' ? data.name : undefined,
   };
-  if (data.currency && data.currency !== "" && data.price && data.price !== "") {
+  if (data.currency && data.currency !== '' && data.price && data.price !== '') {
     conversionParams.price = data.price;
     conversionParams.currency = data.currency;
   }
@@ -285,8 +294,8 @@ function getStringifiedPayload(auctid, sessionId) {
     auctid: auctid,
     action: data.action,
     buyer_pixel_id: data.buyer_pixel_id,
-    conversion_type: data.action === "conversion" ? data.conversion_type : undefined,
-    conversion_params: data.action === "conversion" ? conversionParams : undefined,
+    conversion_type: data.action === 'conversion' ? data.conversion_type : undefined,
+    conversion_params: data.action === 'conversion' ? conversionParams : undefined,
     event_source_url: pageUrl,
     user_session_id: sessionId,
     event_time: getTimestampMillis(),
@@ -410,7 +419,7 @@ ___SERVER_PERMISSIONS___
                   },
                   {
                     "type": 1,
-                    "string": "*"
+                    "string": "/"
                   },
                   {
                     "type": 1,
@@ -457,7 +466,7 @@ ___SERVER_PERMISSIONS___
                   },
                   {
                     "type": 1,
-                    "string": "*"
+                    "string": "/"
                   },
                   {
                     "type": 1,
@@ -574,7 +583,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {'max-age': 2592000, domain: 'teads.com' });
+    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - update cookie if there is already one and auctid is present
@@ -594,7 +603,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {'max-age': 2592000, domain: 'teads.com' });
+    assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.auctid).isEqualTo('1234-1234-1234-1234');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - renew cookie if there is already one and auctid is not present
@@ -613,7 +622,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith('tfpai', '0000-0000-0000-0000', {'max-age': 2592000, domain: 'teads.com' });
+    assertApi('setCookie').wasCalledWith('tfpai', '0000-0000-0000-0000', {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpsi cookie - set cookie if there is not
@@ -631,7 +640,8 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasNotCalledWith("tfpsi", "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", {'max-age': 1800000, domain: 'teads.com' });
+    assertApi('setCookie').wasCalled();
+    assertApi('setCookie').wasNotCalledWith("tfpsi", "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", {domain: 'auto', httpOnly: false, 'max-age': 1800000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.user_session_id).isNotEmpty();
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpsi cookie - update cookie if there is already one
@@ -650,7 +660,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpsi", "4e784302-edbf-47dd-9f74-9c03c3835fe0", {'max-age': 1800000, domain: 'teads.com' });
+    assertApi('setCookie').wasCalledWith("tfpsi", "4e784302-edbf-47dd-9f74-9c03c3835fe0", {domain: 'auto', httpOnly: false, 'max-age': 1800000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.user_session_id).isEqualTo('4e784302-edbf-47dd-9f74-9c03c3835fe0');
     assertApi('gtmOnSuccess').wasCalled();
 - name: Do nothing if there is no auctid
