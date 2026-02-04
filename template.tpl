@@ -194,7 +194,8 @@ ___TEMPLATE_PARAMETERS___
         "name": "productName",
         "displayName": "Product Name",
         "simpleValueType": true,
-        "help": "Set the `product name` parameter when a user completes an action on-site that is valuable for your business."
+        "canBeEmptyString": true,
+        "valueHint": "Product Name"
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
