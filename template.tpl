@@ -187,7 +187,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Blue T-Shirt SFRED1451"
+        "valueHint": "Add to Cart"
       },
       {
         "type": "TEXT",
@@ -195,7 +195,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Product Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Product Name"
+        "valueHint": "Blue T-Shirt ID 12345"
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
