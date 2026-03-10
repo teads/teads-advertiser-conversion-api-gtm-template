@@ -131,6 +131,10 @@ ___TEMPLATE_PARAMETERS___
       {
         "value": "ViewContent",
         "displayValue": "View content"
+      },
+      {
+        "value": "AppInstall",
+        "displayValue": "App install"
       }
     ],
     "simpleValueType": true,
