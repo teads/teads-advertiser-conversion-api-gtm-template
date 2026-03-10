@@ -134,7 +134,7 @@ ___TEMPLATE_PARAMETERS___
       },
       {
         "value": "AppInstall",
-        "displayValue": "App Install"
+        "displayValue": "App install"
       }
     ],
     "simpleValueType": true,
