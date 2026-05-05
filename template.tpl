@@ -1291,7 +1291,7 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: Consent - Block event when ad_storage consent required and denied
+- name: Consent - Block event when ad_storage consent denied
   code: |-
     mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
     mock('isConsentGranted', (consentType) => { return false; });
@@ -1310,7 +1310,7 @@ scenarios:
 
     assertThat(requests.length).isEqualTo(0);
     assertApi('gtmOnSuccess').wasCalled();
-- name: Consent - Allow event when ad_storage consent required and granted
+- name: Consent - Allow event when consent granted
   code: |-
     mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
     mock('isConsentGranted', (consentType) => { return true; });
@@ -1329,7 +1329,7 @@ scenarios:
 
     assertThat(requests.length).isEqualTo(1);
     assertApi('gtmOnSuccess').wasCalled();
-- name: Consent - Allow event when consent check disabled regardless of consent state
+- name: Consent - Allow event when consent check disabled
   code: |-
     mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
     mock('isConsentGranted', (consentType) => { return false; });
@@ -1348,7 +1348,7 @@ scenarios:
 
     assertThat(requests.length).isEqualTo(1);
     assertApi('gtmOnSuccess').wasCalled();
-- name: Consent - Block event when ad_user_data consent is denied
+- name: Consent - Block event when ad_user_data consent denied
   code: |-
     mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
     mock('isConsentGranted', (consentType) => { return consentType === 'ad_storage'; });
