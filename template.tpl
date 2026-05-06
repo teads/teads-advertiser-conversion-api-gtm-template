@@ -225,7 +225,7 @@ ___TEMPLATE_PARAMETERS___
         "checkboxText": "Require ad_storage and ad_user_data consent",
         "simpleValueType": true,
         "defaultValue": true,
-        "help": "When enabled (default), the tag checks Google Consent Mode for 'ad_storage' and 'ad_user_data' consent before sending any data to the Teads Conversion API. Disable only for regions where consent is not legally required."
+        "help": "When enabled (default), the tag checks Google Consent Mode for \u0027ad_storage\u0027 and \u0027ad_user_data\u0027 consent before sending any data to the Teads Conversion API. Disable only for regions where consent is not legally required."
       }
     ]
   },
@@ -250,7 +250,23 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_SERVER___
 
 const getEventData = require('getEventData');
-const isConsentGranted = require('isConsentGranted');
+// Read consent state from Google Consent Mode (x-ga-gcs) event data.
+// Format: G[analytics_storage][ad_storage][ad_user_data][ad_personalization]
+// Each character: '1' = granted, '0' = denied. Absent string means no consent mode configured.
+function isConsentGranted(consentType) {
+  var gcs = getEventData('x-ga-gcs');
+  if (!gcs || gcs.charAt(0) !== 'G') return true;
+  var bits = gcs.slice(1);
+  var positions = {
+    'analytics_storage': 0,
+    'ad_storage': 1,
+    'ad_user_data': 2,
+    'ad_personalization': 3
+  };
+  var pos = positions[consentType];
+  if (pos === undefined) return true;
+  return bits.charAt(pos) !== '0';
+}
 const parseUrl = require('parseUrl');
 const setCookie = require('setCookie');
 const getCookieValues = require('getCookieValues');
@@ -1292,81 +1308,32 @@ scenarios:
 
     assertApi('gtmOnSuccess').wasCalled();
 - name: Consent - Block event when ad_storage consent denied
-  code: |-
-    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
-    mock('isConsentGranted', (consentType) => { return false; });
-    mock('setCookie');
-    mock('getCookieValues', ['0000-0000-0000-0000']);
-
-    const mockData = {
-      token: 'test',
-      buyer_pixel_id: '123',
-      action: 'pageView',
-      is_test: false,
-      requireAdStorageConsent: true,
-    };
-
-    runCode(mockData);
-
-    assertThat(requests.length).isEqualTo(0);
-    assertApi('gtmOnSuccess').wasCalled();
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?\
+    \ 'G0000' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
+    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst\
+    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n\
+    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\
+    \nassertThat(requests.length).isEqualTo(0);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Allow event when consent granted
-  code: |-
-    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
-    mock('isConsentGranted', (consentType) => { return true; });
-    mock('setCookie');
-    mock('getCookieValues', ['0000-0000-0000-0000']);
-
-    const mockData = {
-      token: 'test',
-      buyer_pixel_id: '123',
-      action: 'pageView',
-      is_test: false,
-      requireAdStorageConsent: true,
-    };
-
-    runCode(mockData);
-
-    assertThat(requests.length).isEqualTo(1);
-    assertApi('gtmOnSuccess').wasCalled();
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?\
+    \ 'G1111' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
+    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst\
+    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n\
+    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\
+    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Allow event when consent check disabled
-  code: |-
-    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
-    mock('isConsentGranted', (consentType) => { return false; });
-    mock('setCookie');
-    mock('getCookieValues', ['0000-0000-0000-0000']);
-
-    const mockData = {
-      token: 'test',
-      buyer_pixel_id: '123',
-      action: 'pageView',
-      is_test: false,
-      requireAdStorageConsent: false,
-    };
-
-    runCode(mockData);
-
-    assertThat(requests.length).isEqualTo(1);
-    assertApi('gtmOnSuccess').wasCalled();
+  code: "mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');\nmock('setCookie');\n\
+    mock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token:\
+    \ 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n  is_test: false,\n\
+    \  requireAdStorageConsent: false,\n};\n\nrunCode(mockData);\n\
+    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Block event when ad_user_data consent denied
-  code: |-
-    mock('getEventData', 'https://teads.com?auctid=0000-0000-0000-0000');
-    mock('isConsentGranted', (consentType) => { return consentType === 'ad_storage'; });
-    mock('setCookie');
-    mock('getCookieValues', ['0000-0000-0000-0000']);
-
-    const mockData = {
-      token: 'test',
-      buyer_pixel_id: '123',
-      action: 'pageView',
-      is_test: false,
-      requireAdStorageConsent: true,
-    };
-
-    runCode(mockData);
-
-    assertThat(requests.length).isEqualTo(0);
-    assertApi('gtmOnSuccess').wasCalled();
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?\
+    \ 'G0100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
+    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst\
+    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n\
+    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\
+    \nassertThat(requests.length).isEqualTo(0);\nassertApi('gtmOnSuccess').wasCalled();"
 setup: |-
   const JSON = require('JSON');
 
