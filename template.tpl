@@ -323,35 +323,30 @@ function retrieveSessionIdAndSetOrUpdateCookie() {
 
 function buildPrivacyObject() {
   const privacy = {};
-  var hasFields = false;
 
   // ad_storage consent from Google Consent Mode (x-ga-gcs). Format: "G" + version + ad_storage(0/1) + ...
   const gcs = getEventData('x-ga-gcs');
   if (gcs && gcs.charAt(0) === 'G') {
     privacy.consent_granted = gcs.charAt(2) !== '0';
-    hasFields = true;
   }
 
   // Optional fields forwarded as custom GA4 event parameters by the advertiser
   const gdprApplies = getEventData('gdpr_applies');
   if (gdprApplies !== undefined && gdprApplies !== null) {
     privacy.gdpr_applies = !!gdprApplies;
-    hasFields = true;
   }
 
   const tcfString = getEventData('tcf_consent_string');
   if (tcfString) {
     privacy.tcf_consent_string = tcfString;
-    hasFields = true;
   }
 
   const optOut = getEventData('opt_out');
   if (optOut !== undefined && optOut !== null) {
     privacy.opt_out = !!optOut;
-    hasFields = true;
   }
 
-  return hasFields ? privacy : undefined;
+  return Object.keys(privacy).length > 0 ? privacy : undefined;
 }
 
 function getStringifiedPayload(auctid, sessionId) {
