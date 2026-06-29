@@ -188,10 +188,11 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "name",
-        "displayName": "Name",
+        "displayName": "Conversion Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Add to Cart"
+        "valueHint": "New Purchase",
+        "help": "The conversion (event) name. Sent to Teads as the top-level conversion_name field. Use a generic value like \"New Purchase\" when several products are involved."
       },
       {
         "type": "TEXT",
@@ -199,7 +200,8 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Product Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Blue T-Shirt ID 12345"
+        "valueHint": "Blue T-Shirt ID 12345",
+        "help": "Optional product name. Sent to Teads as conversion_params.name."
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
@@ -295,9 +297,11 @@ function retrieveSessionIdAndSetOrUpdateCookie() {
 }
 
 function getStringifiedPayload(auctid, sessionId) {
+  // CAPI v2 (PERF-5871): the conversion (event) name is the top-level `conversion_name` (-> aepn),
+  // while `conversion_params.name` is the product name (-> aeppn). Map the "Conversion Name" field to
+  // the top-level conversion_name, and the "Product Name" field to conversion_params.name.
   const conversionParams = {
-    name: data.name && data.name !== '' ? data.name : undefined,
-    product_name: data.product_name && data.product_name !== '' ? data.product_name : undefined,
+    name: data.product_name && data.product_name !== '' ? data.product_name : undefined,
   };
   if (data.currency && data.currency !== '' && data.price && data.price !== '') {
     conversionParams.price = data.price;
@@ -308,6 +312,7 @@ function getStringifiedPayload(auctid, sessionId) {
     action: data.action,
     buyer_pixel_id: data.buyer_pixel_id,
     conversion_type: data.action === 'conversion' ? data.conversion_type : undefined,
+    conversion_name: data.action === 'conversion' && data.name && data.name !== '' ? data.name : undefined,
     conversion_params: data.action === 'conversion' ? conversionParams : undefined,
     event_source_url: pageUrl,
     user_session_id: sessionId,
@@ -599,8 +604,7 @@ scenarios:
     assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
-- name: tfpai cookie - update cookie if there is already one and auctid is present
-    in URL
+- name: tfpai cookie - update cookie if there is already one and auctid is present in URL
   code: |-
     mock('getEventData', 'https://teads.com?auctid=1234-1234-1234-1234');
 
@@ -619,8 +623,7 @@ scenarios:
     assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.auctid).isEqualTo('1234-1234-1234-1234');
     assertApi('gtmOnSuccess').wasCalled();
-- name: tfpai cookie - renew cookie if there is already one and auctid is not present
-    in URL
+- name: tfpai cookie - renew cookie if there is already one and auctid is not present in URL
   code: |-
     mock('getEventData', 'https://teads.com');
     mock('setCookie');
@@ -694,174 +697,611 @@ scenarios:
     assertApi('callConversionAPI').wasNotCalled();
     assertApi('gtmOnSuccess').wasCalled();
 - name: ConversionAPI - PageView - Simple call
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'pageView',\n  is_test: false,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/event\"\
-    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'pageView',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - PageView - Ignore Conversion Params & Type
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'pageView',\n  conversion_type: 'AddToCart',\n  price: '123',\n\
-    \  currency: 'USD',\n  name: 'conversion name',\n  product_name: 'Product ABC',\n\
-    \  is_test: false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/event\",\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'pageView',\n    buyer_pixel_id:\
-    \ '123',\n    event_source_url: 'https://teads.com',\n    event_time: 1234,\n    environment:\
-    \ 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - PageView - Call on test route
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'pageView',\n  is_test: true,\n};\n\nrunCode(mockData);\n\n\
-    assertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/test/event\"\
-    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'pageView',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  price: '15.99',\n\
-    \  currency: 'USD',\n  name: 'conversion name',\n  product_name: 'Product ABC',\n\
-    \  is_test: false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/event\",\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    conversion_type:\
-    \ 'AddToCart',\n    buyer_pixel_id: '123',\n    conversion_params: {\n      price:\
-    \ '15.99',\n      currency: 'USD',\n      name: 'conversion name',\n      product_name:\
-    \ 'Product ABC'\n    },\n    event_source_url: 'https://teads.com',\n    event_time:\
-    \ 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call without conversion params
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  is_test:\
-    \ false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n  url:\
-    \ 'https://ca.teads.tv/v1/event',\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json', \n      Authorization: 'Bearer\
-    \ test',\n    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    buyer_pixel_id:\
-    \ '123',\n    conversion_type: 'AddToCart',\n    conversion_params: {},\n    event_source_url:\
-    \ 'https://teads.com',\n    event_time: 1234,\n    environment: 'server-gtm'\n\
-    \  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call with empty string for all conversion
-    params
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  is_test:\
-    \ false,\n  price: '',\n  currency: '',\n  name: '',\n  product_name: '',\n};\n\
-    \nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n  url: 'https://ca.teads.tv/v1/event',\n\
-    \  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'conversion',\n    conversion_type: 'AddToCart',\n    buyer_pixel_id:\
-    \ '123',\n    conversion_params: {},\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call with undefined for all conversion
-    params
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  is_test:\
-    \ false,\n  price: undefined,\n  currency: undefined,\n  name: undefined,\n\
-    \  product_name: undefined,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: 'https://ca.teads.tv/v1/event',\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    buyer_pixel_id:\
-    \ '123',\n    conversion_type: 'AddToCart',\n    conversion_params: {},\n    event_source_url:\
-    \ 'https://teads.com',\n    event_time: 1234,\n    environment: 'server-gtm'\n\
-    \  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call with price but no currency in conversion
-    params
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  price: '15.99',\n\
-    \  currency: '',\n  name: 'conversion name',\n  product_name: 'Product XYZ',\n\
-    \  is_test: false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/event\",\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    conversion_type:\
-    \ 'AddToCart',\n    buyer_pixel_id: '123',\n    conversion_params: {\n      name:\
-    \ 'conversion name',\n      product_name: 'Product XYZ'\n    },\n    event_source_url:\
-    \ 'https://teads.com',\n    event_time: 1234,\n    environment: 'server-gtm'\n\
-    \  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Simple call with currency but no price in conversion
-    params
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  price: '',\n\
-    \  currency: 'USD',\n  name: 'conversion name',\n  product_name: 'Product XYZ',\n\
-    \  is_test: false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/event\",\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    conversion_type:\
-    \ 'AddToCart',\n    buyer_pixel_id: '123',\n    conversion_params: {\n      name:\
-    \ 'conversion name',\n      product_name: 'Product XYZ'\n    },\n    event_source_url:\
-    \ 'https://teads.com',\n    event_time: 1234,\n    environment: 'server-gtm'\n\
-    \  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - Conversion - Call on test route
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'conversion',\n  conversion_type: 'AddToCart',\n  price: '15.99',\n\
-    \  currency: 'USD',\n  name: 'conversion name',\n  product_name: 'Product ABC',\n\
-    \  is_test: true,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/test/event\",\n  options: {\n    method: 'POST',\n\
-    \    headers: {\n      'Content-Type': 'application/json',\n      Authorization:\
-    \ 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'conversion',\n    buyer_pixel_id:\
-    \ '123',\n    conversion_type: 'AddToCart',\n    conversion_params: {\n      price:\
-    \ '15.99',\n      currency: 'USD',\n      name: 'conversion name',\n      product_name:\
-    \ 'Product ABC'\n    },\n    event_source_url: 'https://teads.com',\n    event_time:\
-    \ 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - TimeSpent - Simple call
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'timeSpent',\n  is_test: false,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/event\"\
-    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'timeSpent',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - TimeSpent - Ignore Conversion Params & Type
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'timeSpent',\n  conversion_type: 'AddToCart',\n  price: '123',\n\
-    \  currency: 'USD',\n  name: 'conversion name',\n  product_name: 'Product ABC',\n\
-    \  is_test: false,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
-    \  url: \"https://ca.teads.tv/v1/event\",\n  options: {\n    method: 'POST',\n    headers:\
-    \ {\n      'Content-Type': 'application/json',\n      Authorization: 'Bearer test',\n\
-    \    },\n    timeout: 3000,\n  },\n  body: {\n    auctid: '0000-0000-0000-0000',\n\
-    \    user_session_id: '0000-0000-0000-0000',\n    action: 'timeSpent',\n    buyer_pixel_id:\
-    \ '123',\n    event_source_url: 'https://teads.com',\n    event_time: 1234,\n    environment:\
-    \ 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-- name: ConversionAPI - TimeSpent - Call on test route
-  code: "mock('getEventData', 'https://teads.com');\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'timeSpent',\n  is_test: true,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/test/event\"\
-    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'timeSpent',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
-setup: "const JSON = require('JSON');\n\nconst requests = [];\n\nmock('sendHttpRequest',\
-  \ () => {\n  requests.push({\n    url: arguments[0],\n    options: arguments[1],\n\
-  \    body: JSON.parse(arguments[2]),\n  });\n\n  const response = {\n    then: (callback)\
-  \ => {\n      callback({\n        statusCode: 200,\n        headers: {},\n     \
-  \   body: {},\n      });\n      return response;\n    },\n    catch: (callback)\
-  \ => {\n      callback({\n        reason: \"Mock\",\n      });\n      return response;\n\
-  \    },\n  };\n  \n  return response;\n});\n\nmock('getTimestampMillis', 1234);"
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
 
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'pageView',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - PageView - Ignore Conversion Params & Type
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      conversion_type: 'AddToCart',
+      price: '123',
+      currency: 'USD',
+      name: 'conversion name',
+      product_name: 'Product ABC',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'pageView',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - PageView - Call on test route
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/test/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'pageView',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      price: '15.99',
+      currency: 'USD',
+      name: 'conversion name',
+      product_name: 'Product ABC',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        conversion_type: 'AddToCart',
+        conversion_name: 'conversion name',
+        buyer_pixel_id: '123',
+        conversion_params: {
+          price: '15.99',
+          currency: 'USD',
+          name: 'Product ABC'
+        },
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Maps name to conversion_name and product_name to conversion_params.name
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'Purchase',
+      name: 'New Purchase',
+      product_name: 'Blue T-Shirt ID 12345',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0].body.conversion_name).isEqualTo('New Purchase');
+    assertThat(requests[0].body.conversion_params).isEqualTo({ name: 'Blue T-Shirt ID 12345' });
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call without conversion params
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: 'https://ca.teads.tv/v1/event',
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        buyer_pixel_id: '123',
+        conversion_type: 'AddToCart',
+        conversion_params: {},
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call with empty string for all conversion params
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      is_test: false,
+      price: '',
+      currency: '',
+      name: '',
+      product_name: '',
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: 'https://ca.teads.tv/v1/event',
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        conversion_type: 'AddToCart',
+        buyer_pixel_id: '123',
+        conversion_params: {},
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call with undefined for all conversion params
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      is_test: false,
+      price: undefined,
+      currency: undefined,
+      name: undefined,
+      product_name: undefined,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: 'https://ca.teads.tv/v1/event',
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        buyer_pixel_id: '123',
+        conversion_type: 'AddToCart',
+        conversion_params: {},
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call with price but no currency in conversion params
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      price: '15.99',
+      currency: '',
+      name: 'conversion name',
+      product_name: 'Product XYZ',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        conversion_type: 'AddToCart',
+        conversion_name: 'conversion name',
+        buyer_pixel_id: '123',
+        conversion_params: {
+          name: 'Product XYZ'
+        },
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Simple call with currency but no price in conversion params
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      price: '',
+      currency: 'USD',
+      name: 'conversion name',
+      product_name: 'Product XYZ',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        conversion_type: 'AddToCart',
+        conversion_name: 'conversion name',
+        buyer_pixel_id: '123',
+        conversion_params: {
+          name: 'Product XYZ'
+        },
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - Conversion - Call on test route
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'conversion',
+      conversion_type: 'AddToCart',
+      price: '15.99',
+      currency: 'USD',
+      name: 'conversion name',
+      product_name: 'Product ABC',
+      is_test: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/test/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'conversion',
+        conversion_type: 'AddToCart',
+        conversion_name: 'conversion name',
+        buyer_pixel_id: '123',
+        conversion_params: {
+          price: '15.99',
+          currency: 'USD',
+          name: 'Product ABC'
+        },
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - TimeSpent - Simple call
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'timeSpent',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'timeSpent',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - TimeSpent - Ignore Conversion Params & Type
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'timeSpent',
+      conversion_type: 'AddToCart',
+      price: '123',
+      currency: 'USD',
+      name: 'conversion name',
+      product_name: 'Product ABC',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'timeSpent',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: ConversionAPI - TimeSpent - Call on test route
+  code: |-
+    mock('getEventData', 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'timeSpent',
+      is_test: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0]).isEqualTo({
+      url: "https://ca.teads.tv/v1/test/event",
+      options: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer test',
+        },
+        timeout: 3000,
+      },
+      body: {
+        auctid: '0000-0000-0000-0000',
+        user_session_id: '0000-0000-0000-0000',
+        action: 'timeSpent',
+        buyer_pixel_id: '123',
+        event_source_url: 'https://teads.com',
+        event_time: 1234,
+        environment: 'server-gtm'
+      }
+    });
+
+    assertApi('gtmOnSuccess').wasCalled();
+setup: |-
+  const JSON = require('JSON');
+
+  const requests = [];
+
+  mock('sendHttpRequest', () => {
+    requests.push({
+      url: arguments[0],
+      options: arguments[1],
+      body: JSON.parse(arguments[2]),
+    });
+
+    const response = {
+      then: (callback) => {
+        callback({
+          statusCode: 200,
+          headers: {},
+          body: {},
+        });
+        return response;
+      },
+      catch: (callback) => {
+        callback({
+          reason: "Mock",
+        });
+        return response;
+      },
+    };
+
+    return response;
+  });
+
+  mock('getTimestampMillis', 1234);
 
 ___NOTES___
 
