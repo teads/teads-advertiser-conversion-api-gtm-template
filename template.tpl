@@ -188,10 +188,11 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "name",
-        "displayName": "Name",
+        "displayName": "Conversion Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Add to Cart"
+        "valueHint": "New Purchase",
+        "help": "The conversion (event) name. Sent to Teads as the top-level conversion_name field. Use a generic value like \"New Purchase\" when several products are involved."
       },
       {
         "type": "TEXT",
@@ -199,7 +200,8 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Product Name",
         "simpleValueType": true,
         "canBeEmptyString": true,
-        "valueHint": "Blue T-Shirt ID 12345"
+        "valueHint": "Blue T-Shirt ID 12345",
+        "help": "Optional product name. Sent to Teads as conversion_params.name."
       }
     ],
     "groupStyle": "ZIPPY_OPEN",
@@ -295,9 +297,11 @@ function retrieveSessionIdAndSetOrUpdateCookie() {
 }
 
 function getStringifiedPayload(auctid, sessionId) {
+  // CAPI v2 (PERF-5871): the conversion (event) name is the top-level `conversion_name` (-> aepn),
+  // while `conversion_params.name` is the product name (-> aeppn). Map the "Conversion Name" field to
+  // the top-level conversion_name, and the "Product Name" field to conversion_params.name.
   const conversionParams = {
-    name: data.name && data.name !== '' ? data.name : undefined,
-    product_name: data.product_name && data.product_name !== '' ? data.product_name : undefined,
+    name: data.product_name && data.product_name !== '' ? data.product_name : undefined,
   };
   if (data.currency && data.currency !== '' && data.price && data.price !== '') {
     conversionParams.price = data.price;
@@ -308,6 +312,7 @@ function getStringifiedPayload(auctid, sessionId) {
     action: data.action,
     buyer_pixel_id: data.buyer_pixel_id,
     conversion_type: data.action === 'conversion' ? data.conversion_type : undefined,
+    conversion_name: data.action === 'conversion' && data.name && data.name !== '' ? data.name : undefined,
     conversion_params: data.action === 'conversion' ? conversionParams : undefined,
     event_source_url: pageUrl,
     user_session_id: sessionId,
