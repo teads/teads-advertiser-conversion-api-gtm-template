@@ -323,40 +323,47 @@ function retrieveSessionIdAndSetOrUpdateCookie() {
 
 function buildPrivacyObject() {
   const privacy = {};
+  let hasFields = false;
 
   // ad_storage consent from Google Consent Mode (x-ga-gcs). Format: "G" + version + ad_storage(0/1) + ...
   const gcs = getEventData('x-ga-gcs');
   if (gcs && gcs.charAt(0) === 'G') {
     privacy.consent_granted = gcs.charAt(2) !== '0';
+    hasFields = true;
   }
 
   // Optional fields forwarded as custom GA4 event parameters by the advertiser
   const gdprApplies = getEventData('gdpr_applies');
   if (gdprApplies !== undefined && gdprApplies !== null) {
     privacy.gdpr_applies = !!gdprApplies;
+    hasFields = true;
   }
 
   const tcfString = getEventData('tcf_consent_string');
   if (tcfString) {
     privacy.tcf_consent_string = tcfString;
+    hasFields = true;
   }
 
   const optOut = getEventData('opt_out');
   if (optOut !== undefined && optOut !== null) {
     privacy.opt_out = !!optOut;
+    hasFields = true;
   }
 
   const usPrivacy = getEventData('us_privacy');
   if (usPrivacy) {
     privacy.us_privacy = usPrivacy;
+    hasFields = true;
   }
 
   const gppString = getEventData('gpp_string');
   if (gppString) {
     privacy.gpp_string = gppString;
+    hasFields = true;
   }
 
-  return Object.keys(privacy).length > 0 ? privacy : undefined;
+  return hasFields ? privacy : undefined;
 }
 
 function getStringifiedPayload(auctid, sessionId) {
@@ -952,7 +959,7 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Maps name to conversion_name and product_name to conversion_params.name
+- name: ConversionAPI - Conversion - Maps name to conversion_name and product_name to conversion_params name
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1363,7 +1370,10 @@ scenarios:
     \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Privacy - consent_granted true when x-ga-gcs signals ad_storage granted
   code: |-
-    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : key === 'x-ga-gcs' ? 'G111' : undefined);
+    mock('getEventData', (key) => {
+      const data = { page_location: 'https://teads.com', 'x-ga-gcs': 'G111' };
+      return data[key];
+    });
     mock('setCookie');
     mock('getCookieValues', ['0000-0000-0000-0000']);
 
@@ -1380,7 +1390,10 @@ scenarios:
     assertApi('gtmOnSuccess').wasCalled();
 - name: Privacy - consent_granted false when x-ga-gcs signals ad_storage denied
   code: |-
-    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : key === 'x-ga-gcs' ? 'G100' : undefined);
+    mock('getEventData', (key) => {
+      const data = { page_location: 'https://teads.com', 'x-ga-gcs': 'G100' };
+      return data[key];
+    });
     mock('setCookie');
     mock('getCookieValues', ['0000-0000-0000-0000']);
 
@@ -1397,7 +1410,10 @@ scenarios:
     assertApi('gtmOnSuccess').wasCalled();
 - name: Privacy - custom fields forwarded when present in event data
   code: |-
-    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : key === 'gdpr_applies' ? 1 : key === 'tcf_consent_string' ? 'CPokAsAPokAsA' : undefined);
+    mock('getEventData', (key) => {
+      const data = { page_location: 'https://teads.com', gdpr_applies: 1, tcf_consent_string: 'CPokAsAPokAsA' };
+      return data[key];
+    });
     mock('setCookie');
     mock('getCookieValues', ['0000-0000-0000-0000']);
 
@@ -1414,7 +1430,10 @@ scenarios:
     assertApi('gtmOnSuccess').wasCalled();
 - name: Privacy - US privacy and GPP fields forwarded when present in event data
   code: |-
-    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : key === 'us_privacy' ? '1YNN' : key === 'gpp_string' ? 'DBABLA~BVQVAAAAAg' : undefined);
+    mock('getEventData', (key) => {
+      const data = { page_location: 'https://teads.com', us_privacy: '1YNN', gpp_string: 'DBABLA~BVQVAAAAAg' };
+      return data[key];
+    });
     mock('setCookie');
     mock('getCookieValues', ['0000-0000-0000-0000']);
 
