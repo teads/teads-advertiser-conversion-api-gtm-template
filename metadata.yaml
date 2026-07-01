@@ -1,6 +1,8 @@
 homepage: "https://www.teads.com"
 documentation: "https://help.teads.com/en/collections/3221002-teads-universal-pixel"
 versions:
+  - sha: ecbd2b25bde3c19759559be9ef0caa724c17a563
+    changeNotes: 'Align with CAPI v2: send conversion_name top-level, product_name as conversion_params.name'
   - sha: c78e7ec74ef98eb446cf768b1c6afd1fb56caba7
     changeNotes: Add app install category
   - sha: 53a8efdf46c4c779213868403a0483d763f26891
