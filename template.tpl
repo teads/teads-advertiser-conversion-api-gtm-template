@@ -346,6 +346,16 @@ function buildPrivacyObject() {
     privacy.opt_out = !!optOut;
   }
 
+  const usPrivacy = getEventData('us_privacy');
+  if (usPrivacy) {
+    privacy.us_privacy = usPrivacy;
+  }
+
+  const gppString = getEventData('gpp_string');
+  if (gppString) {
+    privacy.gpp_string = gppString;
+  }
+
   return Object.keys(privacy).length > 0 ? privacy : undefined;
 }
 
@@ -436,11 +446,23 @@ ___SERVER_PERMISSIONS___
               },
               {
                 "type": 1,
-                "string": "x-ga-gdpr"
+                "string": "gdpr_applies"
               },
               {
                 "type": 1,
-                "string": "x-ga-tcf"
+                "string": "tcf_consent_string"
+              },
+              {
+                "type": 1,
+                "string": "opt_out"
+              },
+              {
+                "type": 1,
+                "string": "us_privacy"
+              },
+              {
+                "type": 1,
+                "string": "gpp_string"
               }
             ]
           }
@@ -1389,6 +1411,23 @@ scenarios:
     runCode(mockData);
 
     assertThat(requests[0].body.privacy).isEqualTo({ gdpr_applies: true, tcf_consent_string: 'CPokAsAPokAsA' });
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Privacy - US privacy and GPP fields forwarded when present in event data
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : key === 'us_privacy' ? '1YNN' : key === 'gpp_string' ? 'DBABLA~BVQVAAAAAg' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0].body.privacy).isEqualTo({ us_privacy: '1YNN', gpp_string: 'DBABLA~BVQVAAAAAg' });
     assertApi('gtmOnSuccess').wasCalled();
 setup: |-
   const JSON = require('JSON');
