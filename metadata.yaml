@@ -1,6 +1,12 @@
 homepage: "https://www.teads.com"
 documentation: "https://help.teads.com/en/collections/3221002-teads-universal-pixel"
 versions:
+  - sha: 408ab6748b119b8c39bc9b6cbd42168d2b4806a3
+    changeNotes: Forward consent signals (privacy object) to the Conversion API
+  - sha: 610ccb2e76972f454612774ea0e4af72f1f0ffec
+    changeNotes: Add consent checking for sGTM (Consent Mode)
+  - sha: ecbd2b25bde3c19759559be9ef0caa724c17a563
+    changeNotes: 'Align with CAPI v2: send conversion_name top-level, product_name as conversion_params.name'
   - sha: c78e7ec74ef98eb446cf768b1c6afd1fb56caba7
     changeNotes: Add app install category
   - sha: 53a8efdf46c4c779213868403a0483d763f26891
