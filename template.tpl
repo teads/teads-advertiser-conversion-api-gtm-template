@@ -241,6 +241,21 @@ ___TEMPLATE_PARAMETERS___
         "checkboxText": "Use testing API",
         "simpleValueType": true,
         "help": "Testing environment will check your payload and its associated token. We recommend to check it before sending anything to the production environment."
+      },
+      {
+        "type": "SELECT",
+        "name": "click_id_source",
+        "displayName": "Click ID Source",
+        "macrosInSelect": true,
+        "selectItems": [
+          {
+            "value": "auto",
+            "displayValue": "Auto-detect from URL (dicbo or auctid)"
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": "auto",
+        "help": "Choose how to capture the click ID. Use 'Auto-detect from URL' for automatic dicbo/auctid detection, or enter a custom GTM variable (e.g., {{Click ID}}, {{dataLayer.clickId}})."
       }
     ]
   }
@@ -299,7 +314,26 @@ function setFirstPartyCookie(cookie, value) {
 }
 
 function retrieveAuctidAndSetOrUpdateCookie() {
+  let clickId = null;
+
+  // Check if custom GTM variable is specified (anything other than 'auto')
+  if (data.click_id_source && data.click_id_source !== 'auto') {
+    clickId = data.click_id_source;
+    if (clickId) {
+      setFirstPartyCookie(TFPAI_COOKIE, clickId);
+      return clickId;
+    }
+  }
+
   const parsedUrl = parseUrl(pageUrl);
+
+  // Auto-detection: dicbo first (Feed-in-TAM), then auctid (existing Teads traffic)
+  const urlDicbo = parsedUrl && parsedUrl.searchParams ? parsedUrl.searchParams.dicbo : undefined;
+  if (urlDicbo) {
+    setFirstPartyCookie(TFPAI_COOKIE, urlDicbo);
+    return urlDicbo;
+  }
+
   const urlAuctid = parsedUrl && parsedUrl.searchParams ? parsedUrl.searchParams.auctid : undefined;
   if(urlAuctid) {
     setFirstPartyCookie(TFPAI_COOKIE, urlAuctid);
@@ -366,7 +400,7 @@ function buildPrivacyObject() {
   return hasFields ? privacy : undefined;
 }
 
-function getStringifiedPayload(auctid, sessionId) {
+function getStringifiedPayload(clickId, sessionId) {
   // CAPI v2 (PERF-5871): the conversion (event) name is the top-level `conversion_name` (-> aepn),
   // while `conversion_params.name` is the product name (-> aeppn). Map the "Conversion Name" field to
   // the top-level conversion_name, and the "Product Name" field to conversion_params.name.
@@ -378,7 +412,7 @@ function getStringifiedPayload(auctid, sessionId) {
     conversionParams.currency = data.currency;
   }
   return JSON.stringify({
-    auctid: auctid,
+    click_id: clickId,
     action: data.action,
     buyer_pixel_id: data.buyer_pixel_id,
     conversion_type: data.action === 'conversion' ? data.conversion_type : undefined,
@@ -392,7 +426,7 @@ function getStringifiedPayload(auctid, sessionId) {
   });
 }
 
-function callConversionAPI(auctid, sessionId) {
+function callConversionAPI(clickId, sessionId) {
   const url = data.is_test ? CONVERSION_API_TEST_URL : CONVERSION_API_URL;
 
   const headers = {
@@ -406,7 +440,7 @@ function callConversionAPI(auctid, sessionId) {
     timeout: 3000
   };
 
-  sendHttpRequest(url, options, getStringifiedPayload(auctid, sessionId)).then((result) => {
+  sendHttpRequest(url, options, getStringifiedPayload(clickId, sessionId)).then((result) => {
     if (result.statusCode >= 200 && result.statusCode < 300) {
       data.gtmOnSuccess();
     } else {
@@ -418,11 +452,11 @@ function callConversionAPI(auctid, sessionId) {
 if (data.requireAdStorageConsent && !isAdStorageGranted()) {
 }
 
-const auctid = retrieveAuctidAndSetOrUpdateCookie();
+const clickId = retrieveAuctidAndSetOrUpdateCookie();
 const sessionId = retrieveSessionIdAndSetOrUpdateCookie();
 
-if(auctid) {
-  callConversionAPI(auctid, sessionId);
+if(clickId) {
+  callConversionAPI(clickId, sessionId);
 } else {
   data.gtmOnSuccess();
 }
@@ -700,7 +734,7 @@ scenarios:
     runCode(mockData);
 
     assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
-    assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
+    assertThat(requests[0].body.click_id).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - update cookie if there is already one and auctid is present in URL
   code: |-
@@ -719,7 +753,7 @@ scenarios:
     runCode(mockData);
 
     assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
-    assertThat(requests[0].body.auctid).isEqualTo('1234-1234-1234-1234');
+    assertThat(requests[0].body.click_id).isEqualTo('1234-1234-1234-1234');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpai cookie - renew cookie if there is already one and auctid is not present in URL
   code: |-
@@ -737,7 +771,7 @@ scenarios:
     runCode(mockData);
 
     assertApi('setCookie').wasCalledWith('tfpai', '0000-0000-0000-0000', {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
-    assertThat(requests[0].body.auctid).isEqualTo('0000-0000-0000-0000');
+    assertThat(requests[0].body.click_id).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpsi cookie - set cookie if there is not
   code: |-
@@ -794,6 +828,80 @@ scenarios:
 
     assertApi('callConversionAPI').wasNotCalled();
     assertApi('gtmOnSuccess').wasCalled();
+- name: Feed-in-TAM - dicbo parameter extraction
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?dicbo=amp_12345' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "amp_12345", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertThat(requests[0].body.click_id).isEqualTo('amp_12345');
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Feed-in-TAM - dicbo priority over auctid
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?dicbo=amp_12345&auctid=teads_67890' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "amp_12345", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertThat(requests[0].body.click_id).isEqualTo('amp_12345');
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Click ID Source - custom GTM variable
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      click_id_source: 'custom_click_123',
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "custom_click_123", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertThat(requests[0].body.click_id).isEqualTo('custom_click_123');
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Click ID Source - GTM variable syntax
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      click_id_source: 'gtm_var_value_from_datalayer',
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "gtm_var_value_from_datalayer", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertThat(requests[0].body.click_id).isEqualTo('gtm_var_value_from_datalayer');
+    assertApi('gtmOnSuccess').wasCalled();
 - name: ConversionAPI - PageView - Simple call
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
@@ -820,7 +928,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'pageView',
         buyer_pixel_id: '123',
@@ -862,7 +970,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'pageView',
         buyer_pixel_id: '123',
@@ -899,7 +1007,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'pageView',
         buyer_pixel_id: '123',
@@ -941,7 +1049,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         conversion_type: 'AddToCart',
@@ -1007,7 +1115,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         buyer_pixel_id: '123',
@@ -1051,7 +1159,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         conversion_type: 'AddToCart',
@@ -1095,7 +1203,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         buyer_pixel_id: '123',
@@ -1139,7 +1247,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         conversion_type: 'AddToCart',
@@ -1186,7 +1294,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         conversion_type: 'AddToCart',
@@ -1233,7 +1341,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'conversion',
         conversion_type: 'AddToCart',
@@ -1277,7 +1385,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'timeSpent',
         buyer_pixel_id: '123',
@@ -1319,7 +1427,7 @@ scenarios:
         timeout: 3000,
       },
       body: {
-        auctid: '0000-0000-0000-0000',
+        click_id: '0000-0000-0000-0000',
         user_session_id: '0000-0000-0000-0000',
         action: 'timeSpent',
         buyer_pixel_id: '123',
@@ -1331,43 +1439,15 @@ scenarios:
 
     assertApi('gtmOnSuccess').wasCalled();
 - name: ConversionAPI - TimeSpent - Call on test route
-  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);\nmock('setCookie');\nmock('getCookieValues',\
-    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\
-    \ '123',\n  action: 'timeSpent',\n  is_test: true,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/test/event\"\
-    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\
-    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\
-    \ {\n    auctid: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\
-    \    action: 'timeSpent',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\
-    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);\nmock('setCookie');\nmock('getCookieValues',\    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\    \ '123',\n  action: 'timeSpent',\n  is_test: true,\n};\n\nrunCode(mockData);\n\    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/test/event\"\    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\    \ {\n    click_id: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\    \    action: 'timeSpent',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - does not block when ad_storage denied (checkbox on)
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?\
-    \ 'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
-    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst\
-    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n\
-    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?    \ 'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Allow event when consent granted
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://t\
-    eads.com?auctid=0000-0000-0000-0000');\nmock('setCookie');\nmock('getCookie\
-    Values', ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\
-    \n  buyer_pixel_id: '123',\n  action: 'pageView',\n  is_test: false,\n  req\
-    uireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\nassertThat(request\
-    s.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://t    eads.com?auctid=0000-0000-0000-0000');\nmock('setCookie');\nmock('getCookie    Values', ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',    \n  buyer_pixel_id: '123',\n  action: 'pageView',\n  is_test: false,\n  req    uireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\nassertThat(request    s.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Allow event when consent check disabled
-  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?auctid=0000-0000-0000-0000' : undefined);\
-    \nmock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n\
-    const mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: '\
-    pageView',\n  is_test: false,\n  requireAdStorageConsent: false,\n};\n\nrun\
-    Code(mockData);\n\nassertThat(requests.length).isEqualTo(1);\nassertApi('gt\
-    mOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?auctid=0000-0000-0000-0000' : undefined);    \nmock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n    const mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: '    pageView',\n  is_test: false,\n  requireAdStorageConsent: false,\n};\n\nrun    Code(mockData);\n\nassertThat(requests.length).isEqualTo(1);\nassertApi('gt    mOnSuccess').wasCalled();"
 - name: Consent - Allow event when ad_storage granted despite analytics_storage denied
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?\
-    \ 'G110' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
-    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst\
-    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n\
-    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\
-    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?    \ 'G110' : 'https://teads.com?auctid=0000-0000-0000-0000');\n    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Privacy - consent_granted true when x-ga-gcs signals ad_storage granted
   code: |-
     mock('getEventData', (key) => {
