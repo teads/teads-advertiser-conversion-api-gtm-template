@@ -1,12 +1,4 @@
-﻿___TERMS_OF_SERVICE___
-
-By creating or modifying this file you agree to Google Tag Manager's Community
-Template Gallery Developer Terms of Service available at
-https://developers.google.com/tag-manager/gallery-tos (or such other URL as
-Google may provide), as modified from time to time.
-
-
-___INFO___
+﻿___INFO___
 
 {
   "type": "TAG",
@@ -255,7 +247,7 @@ ___TEMPLATE_PARAMETERS___
         ],
         "simpleValueType": true,
         "defaultValue": "auto",
-        "help": "Choose how to capture the click ID. Use 'Auto-detect from URL' for automatic dicbo/auctid detection, or enter a custom GTM variable (e.g., {{Click ID}}, {{dataLayer.clickId}})."
+        "help": "Choose how to capture the click ID. Use \u0027Auto-detect from URL\u0027 for automatic dicbo/auctid detection, or enter a custom GTM variable (e.g., {{Click ID}}, {{dataLayer.clickId}})."
       }
     ]
   }
@@ -736,7 +728,8 @@ scenarios:
     assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.click_id).isEqualTo('0000-0000-0000-0000');
     assertApi('gtmOnSuccess').wasCalled();
-- name: tfpai cookie - update cookie if there is already one and auctid is present in URL
+- name: tfpai cookie - update cookie if there is already one and auctid is present
+    in URL
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?auctid=1234-1234-1234-1234' : undefined);
 
@@ -755,7 +748,8 @@ scenarios:
     assertApi('setCookie').wasCalledWith("tfpai", "1234-1234-1234-1234", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.click_id).isEqualTo('1234-1234-1234-1234');
     assertApi('gtmOnSuccess').wasCalled();
-- name: tfpai cookie - renew cookie if there is already one and auctid is not present in URL
+- name: tfpai cookie - renew cookie if there is already one and auctid is not present
+    in URL
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1067,7 +1061,8 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Maps name to conversion_name and product_name to conversion_params name
+- name: ConversionAPI - Conversion - Maps name to conversion_name and product_name
+    to conversion_params name
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1128,7 +1123,8 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Simple call with empty string for all conversion params
+- name: ConversionAPI - Conversion - Simple call with empty string for all conversion
+    params
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1172,7 +1168,8 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Simple call with undefined for all conversion params
+- name: ConversionAPI - Conversion - Simple call with undefined for all conversion
+    params
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1216,7 +1213,8 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Simple call with price but no currency in conversion params
+- name: ConversionAPI - Conversion - Simple call with price but no currency in conversion
+    params
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1263,7 +1261,8 @@ scenarios:
     });
 
     assertApi('gtmOnSuccess').wasCalled();
-- name: ConversionAPI - Conversion - Simple call with currency but no price in conversion params
+- name: ConversionAPI - Conversion - Simple call with currency but no price in conversion
+    params
   code: |-
     mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);
     mock('setCookie');
@@ -1439,15 +1438,64 @@ scenarios:
 
     assertApi('gtmOnSuccess').wasCalled();
 - name: ConversionAPI - TimeSpent - Call on test route
-  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com' : undefined);\nmock('setCookie');\nmock('getCookieValues',\    \ ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',\n  buyer_pixel_id:\    \ '123',\n  action: 'timeSpent',\n  is_test: true,\n};\n\nrunCode(mockData);\n\    \nassertThat(requests[0]).isEqualTo({\n  url: \"https://ca.teads.tv/v1/test/event\"\    ,\n  options: {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\    \ \n      Authorization: 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body:\    \ {\n    click_id: '0000-0000-0000-0000',\n    user_session_id: '0000-0000-0000-0000',\n\    \    action: 'timeSpent',\n    buyer_pixel_id: '123',\n    event_source_url: 'https://teads.com',\n\    \    event_time: 1234,\n    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com'\
+    \ : undefined);\nmock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\
+    \nconst mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'timeSpent',\n\
+    \  is_test: true,\n};\n\nrunCode(mockData);\n\nassertThat(requests[0]).isEqualTo({\n\
+    \  url: \"https://ca.teads.tv/v1/test/event\",\n  options: {\n    method: 'POST',\n\
+    \    headers: {\n      'Content-Type': 'application/json', \n      Authorization:\
+    \ 'Bearer test',\n    },\n    timeout: 3000,\n  },\n  body: {\n    click_id: '0000-0000-0000-0000',\n\
+    \    user_session_id: '0000-0000-0000-0000',\n    action: 'timeSpent',\n    buyer_pixel_id:\
+    \ '123',\n    event_source_url: 'https://teads.com',\n    event_time: 1234,\n\
+    \    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - does not block when ad_storage denied (checkbox on)
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?    \ 'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?     'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
+    \    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n\
+    const     mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action:\
+    \ 'pageView',\n      is_test: false,\n  requireAdStorageConsent: true,\n};\n\n\
+    runCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - Allow event when consent granted
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://t    eads.com?auctid=0000-0000-0000-0000');\nmock('setCookie');\nmock('getCookie    Values', ['0000-0000-0000-0000']);\n\nconst mockData = {\n  token: 'test',    \n  buyer_pixel_id: '123',\n  action: 'pageView',\n  is_test: false,\n  req    uireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n\nassertThat(request    s.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: |-
+    mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://teads.com?auctid=0000-0000-0000-0000');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests.length).isEqualTo(1);
+    assertApi('gtmOnSuccess').wasCalled();
 - name: Consent - Allow event when consent check disabled
-  code: "mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?auctid=0000-0000-0000-0000' : undefined);    \nmock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n    const mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: '    pageView',\n  is_test: false,\n  requireAdStorageConsent: false,\n};\n\nrun    Code(mockData);\n\nassertThat(requests.length).isEqualTo(1);\nassertApi('gt    mOnSuccess').wasCalled();"
+  code: |-
+    mock('getEventData', (key) => key === 'page_location' ? 'https://teads.com?auctid=0000-0000-0000-0000' : undefined);
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: false,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests.length).isEqualTo(1);
+    assertApi('gtmOnSuccess').wasCalled();
 - name: Consent - Allow event when ad_storage granted despite analytics_storage denied
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?    \ 'G110' : 'https://teads.com?auctid=0000-0000-0000-0000');\n    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\nconst    \ mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action: 'pageView',\n    \  is_test: false,\n  requireAdStorageConsent: true,\n};\n\nrunCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?     'G110' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
+    \    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n\
+    const     mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action:\
+    \ 'pageView',\n      is_test: false,\n  requireAdStorageConsent: true,\n};\n\n\
+    runCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Privacy - consent_granted true when x-ga-gcs signals ad_storage granted
   code: |-
     mock('getEventData', (key) => {
@@ -1561,6 +1609,7 @@ setup: |-
   });
 
   mock('getTimestampMillis', 1234);
+
 
 ___NOTES___
 
