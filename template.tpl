@@ -217,7 +217,7 @@ ___TEMPLATE_PARAMETERS___
         "checkboxText": "Require ad_storage consent",
         "simpleValueType": true,
         "defaultValue": true,
-        "help": "When enabled (default), the tag checks the Google Consent Mode \u0027x-ga-gcs\u0027 signal for \u0027ad_storage\u0027 consent before sending data to the Teads Conversion API. Disable only for regions where consent is not legally required."
+        "help": "When enabled (default), the tag checks the Google Consent Mode \u0027x-ga-gcs\u0027 signal and does not write the tfpai and tfpsi cookies when \u0027ad_storage\u0027 is denied. Events are still sent to the Teads Conversion API with the consent state in the privacy object. Disable only for regions where consent is not legally required."
       }
     ]
   },
@@ -295,6 +295,7 @@ function generateUUID() {
 }
 
 function setFirstPartyCookie(cookie, value) {
+  if (data.requireAdStorageConsent && !isAdStorageGranted()) return;
   setCookie(cookie.name, value, {
     domain: 'auto',
     httpOnly: false,
@@ -439,9 +440,6 @@ function callConversionAPI(clickId, sessionId) {
       data.gtmOnFailure();
     }
   }).catch(data.gtmOnFailure);
-}
-
-if (data.requireAdStorageConsent && !isAdStorageGranted()) {
 }
 
 const clickId = retrieveAuctidAndSetOrUpdateCookie();
@@ -1449,11 +1447,81 @@ scenarios:
     \ '123',\n    event_source_url: 'https://teads.com',\n    event_time: 1234,\n\
     \    environment: 'server-gtm'\n  }\n});\n\nassertApi('gtmOnSuccess').wasCalled();"
 - name: Consent - does not block when ad_storage denied (checkbox on)
-  code: "mock('getEventData', (key) => key === 'x-ga-gcs' ?     'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');\n\
-    \    mock('setCookie');\nmock('getCookieValues', ['0000-0000-0000-0000']);\n\n\
-    const     mockData = {\n  token: 'test',\n  buyer_pixel_id: '123',\n  action:\
-    \ 'pageView',\n      is_test: false,\n  requireAdStorageConsent: true,\n};\n\n\
-    runCode(mockData);\n    \nassertThat(requests.length).isEqualTo(1);\nassertApi('gtmOnSuccess').wasCalled();"
+  code: |-
+    mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests.length).isEqualTo(1);
+    assertThat(requests[0].body.click_id).isEqualTo('0000-0000-0000-0000');
+    assertApi('setCookie').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Consent - sends stored click id without renewing cookies when ad_storage denied
+  code: |-
+    mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G100' : 'https://teads.com');
+    mock('setCookie');
+    mock('getCookieValues', ['0000-0000-0000-0000']);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: true,
+    };
+
+    runCode(mockData);
+
+    assertThat(requests[0].body.click_id).isEqualTo('0000-0000-0000-0000');
+    assertThat(requests[0].body.user_session_id).isEqualTo('0000-0000-0000-0000');
+    assertApi('setCookie').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Consent - writes cookies when ad_storage granted (checkbox on)
+  code: |-
+    mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://teads.com?auctid=0000-0000-0000-0000');
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: true,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Consent - writes cookies when ad_storage denied and consent check disabled
+  code: |-
+    mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G100' : 'https://teads.com?auctid=0000-0000-0000-0000');
+    mock('setCookie');
+    mock('getCookieValues', []);
+
+    const mockData = {
+      token: 'test',
+      buyer_pixel_id: '123',
+      action: 'pageView',
+      is_test: false,
+      requireAdStorageConsent: false,
+    };
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasCalledWith("tfpai", "0000-0000-0000-0000", {domain: 'auto', httpOnly: false, 'max-age': 2592000, path: '/', secure: true, samesite: 'none'});
+    assertApi('gtmOnSuccess').wasCalled();
 - name: Consent - Allow event when consent granted
   code: |-
     mock('getEventData', (key) => key === 'x-ga-gcs' ? 'G111' : 'https://teads.com?auctid=0000-0000-0000-0000');
