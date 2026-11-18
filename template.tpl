@@ -274,7 +274,7 @@ const getTimestampMillis = require('getTimestampMillis');
 const generateRandom = require('generateRandom');
 
 const TFPAI_COOKIE = { name: 'tfpai', ttl: 2592000 }; // 30 days
-const TFPSI_COOKIE = { name: 'tfpsi', ttl: 1800000 }; // 30 minutes
+const TFPSI_COOKIE = { name: 'tfpsi', ttl: 1800 }; // 30 minutes
 
 const CONVERSION_API_URL = 'https://ca.teads.tv/v1/event';
 const CONVERSION_API_TEST_URL = 'https://ca.teads.tv/v1/test/event';
@@ -783,7 +783,7 @@ scenarios:
     runCode(mockData);
 
     assertApi('setCookie').wasCalled();
-    assertApi('setCookie').wasNotCalledWith("tfpsi", "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", {domain: 'auto', httpOnly: false, 'max-age': 1800000, path: '/', secure: true, samesite: 'none'});
+    assertApi('setCookie').wasNotCalledWith("tfpsi", "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx", {domain: 'auto', httpOnly: false, 'max-age': 1800, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.user_session_id).isNotEmpty();
     assertApi('gtmOnSuccess').wasCalled();
 - name: tfpsi cookie - update cookie if there is already one
@@ -802,7 +802,7 @@ scenarios:
 
     runCode(mockData);
 
-    assertApi('setCookie').wasCalledWith("tfpsi", "4e784302-edbf-47dd-9f74-9c03c3835fe0", {domain: 'auto', httpOnly: false, 'max-age': 1800000, path: '/', secure: true, samesite: 'none'});
+    assertApi('setCookie').wasCalledWith("tfpsi", "4e784302-edbf-47dd-9f74-9c03c3835fe0", {domain: 'auto', httpOnly: false, 'max-age': 1800, path: '/', secure: true, samesite: 'none'});
     assertThat(requests[0].body.user_session_id).isEqualTo('4e784302-edbf-47dd-9f74-9c03c3835fe0');
     assertApi('gtmOnSuccess').wasCalled();
 - name: Do nothing if there is no auctid
